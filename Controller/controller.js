@@ -61,13 +61,6 @@ const downloadPdf = async (req, res) => {
     console.log("Sum of age:", sum);
     console.log("Count :", count);
 
-    const pdfElement = {
-      Count: count,
-      averageAge: sum / count,
-    };
-    res.send(pdfElement);
-    console.log("Pdf:", pdfElement);
-
     // Create a document
     const doc = new PDFDocument();
 
@@ -76,8 +69,15 @@ const downloadPdf = async (req, res) => {
     doc.pipe(fs.createWriteStream("./Upload/output.pdf"));
 
     // Embed a font, set the font size, and render some text
-    doc.fontSize(25).text(pdfElement, 100, 100);
+    doc
+      .fontSize(25)
+      .text(
+        `totalNumber of Record's:${count} || averageAge:${sum / count}`,
+        100,
+        100
+      );
     doc.end();
+    res.send("Pdf created successfully");
   } catch (error) {
     console.log(error);
   }
