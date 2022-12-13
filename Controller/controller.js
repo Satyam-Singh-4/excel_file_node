@@ -7,23 +7,45 @@ const user = require("../Model/user");
 const readFile = async (req, res) => {
   try {
     let data = [];
+    let msg = [];
     const workbook = new excelJs.Workbook();
     await workbook.xlsx.readFile(req.file.path);
     fs.unlinkSync(req.file.path);
 
     workbook.eachSheet(function (workSheet) {
-      workSheet.eachRow(function (row) {
-        if (onlyLetters(row.values[1]) && containsOnlyNumbers(row.values[2])) {
-          let data1 = {
-            Name: row.values[1],
-            Age: row.values[2],
-          };
-          console.log("data:", data1);
-          data.push(data1);
-        }
-      });
+      const rCount = workSheet.rowCount - 1;
+
+      console.log(rCount);
+
+      if (rCount > 0 && workSheet.columnCount === 2) {
+        workSheet.eachRow(function (row) {
+          if (row.values[1] == null || row.values[2] == null) {
+            throw " field must not be empty";
+            //msg.push(err1);
+          } else {
+            if (
+              onlyLetters(row.values[1]) &&
+              containsOnlyNumbers(row.values[2])
+            ) {
+              let data1 = {
+                Name: row.values[1],
+                Age: row.values[2],
+              };
+              data.push(data1);
+            } else {
+              let err = "Name or Age is not in proper format";
+              msg.push(err);
+            }
+          }
+        });
+      } else {
+        const message = "Row is not existed";
+        msg.push(message);
+      }
     });
     console.log(data);
+    console.log(msg);
+
     //Db Insertion
     const resp = await user.bulkCreate(data);
     res.send(resp);
