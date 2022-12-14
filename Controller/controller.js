@@ -6,67 +6,47 @@ const user = require("../Model/user");
 //Reading Excel File
 const readFile = async (req, res) => {
   try {
-    let data = [];
+    let resp1;
     let msg = [];
     const workbook = new excelJs.Workbook();
     await workbook.xlsx.readFile(req.file.path);
     fs.unlinkSync(req.file.path);
 
-    workbook.eachSheet(function (workSheet) {
-      const actualCount = workSheet.actualRowCount;
-      const rCount = workSheet.rowCount;
-      console.log(rCount);
+    //let workSheet = workbook.getWorksheet[0];
+    const actualCount = workbook.worksheets[0].actualRowCount;
+    const rCount = workbook.worksheets[0].rowCount;
+    console.log(rCount);
 
-      //Check data availability in sheet
-      if (actualCount > 1) {
-        let resp = validateHeaders(workSheet.getRow(1).values);
-        //header validation
-        if (resp.status === "ERROR") {
-          msg.push({ location: resp.location, message: resp.message });
-        } else {
-          for (let index = 2; index <= rCount; index++) {
-            const element = workSheet.getRow(index).values;
-            //console.log("Element", element);
-            if (
-              workSheet.getRow(index).values[1] == null ||
-              workSheet.getRow(index).values[2] == null
-            ) {
-              msg.push({
-                Message: "Field must not be empty",
-                location: "Row" + index,
-              });
-            } else {
-              if (
-                onlyLetters(workSheet.getRow(index).values[1]) &&
-                containsOnlyNumbers(workSheet.getRow(index).values[2])
-              ) {
-                let data1 = {
-                  Name: element[1],
-                  Age: element[2],
-                };
-                data.push(data1);
-              } else {
-                msg.push({
-                  status: "ERROR",
-                  error_Name: workSheet.getRow(index).values[1],
-                  errors_Age: workSheet.getRow(index).values[2],
-                });
-              }
-            }
-          }
-        }
+    //Check data availability in sheet
+    if (actualCount > 1) {
+      let resp = validateHeaders(workbook.worksheets[0].getRow(1).values);
+      //header validation
+      if (resp.status === "ERROR") {
+        msg.push({ location: resp.location, message: resp.message });
       } else {
-        msg.push("Data is not available in sheet ");
+        //Field validation
+        resp1 = fieldValidation(rCount, workbook);
+        if (resp1.status === "ERROR") {
+          msg.push(resp1);
+        } else {
+          console.log("Response:", resp1);
+        }
       }
-      //console.log(msg);
+    } else {
+      msg.push("Data is not available in sheet ");
+    }
+    //console.log(msg);
 
-      console.log(msg);
-      console.log(data);
-    });
+    console.log(msg);
 
     // //Db Insertion
-    const resp = await user.bulkCreate(data);
-    res.send(resp);
+    if (msg.length > 0) {
+      throw "Insertion failed";
+    } else {
+      const resp = await user.bulkCreate(resp1);
+      res.send(resp);
+      //console.log(resp)
+    }
   } catch (error) {
     res.send(error);
     console.log(error);
@@ -123,16 +103,18 @@ const downloadPdf = async (req, res) => {
   }
 };
 
-//Validation function
+
+
+//Validate name
 function onlyLetters(str) {
   return /^[a-zA-Z]+$/.test(str);
 }
-
+//Validate Age
 function containsOnlyNumbers(str) {
   return /^[0-9]+$/.test(str);
 }
 
-//validation function
+//Header validation function
 function validateHeaders(headerRow) {
   // console.log(headerRow);
 
@@ -143,6 +125,42 @@ function validateHeaders(headerRow) {
   }
 }
 
+//Field validation
+
+function fieldValidation(rCount, workbook) {
+  let array = [];
+
+  for (let index = 2; index <= rCount; index++) {
+    if (
+      workbook.worksheets[0].getRow(index).values[1] == null ||
+      workbook.worksheets[0].getRow(index).values[2] == null
+    ) {
+      return {
+        status: "Error",
+        Message: "Field must not be empty",
+        location: "Row" + index,
+      };
+    } else {
+      if (
+        onlyLetters(workbook.worksheets[0].getRow(index).values[1]) &&
+        containsOnlyNumbers(workbook.worksheets[0].getRow(index).values[2])
+      ) {
+        let data1 = {
+          Name: element[1],
+          Age: element[2],
+        };
+        array.push(data1);
+      } else {
+        return {
+          status: "ERROR",
+          error_Name: workbook.worksheets[0].getRow(index).values[1],
+          errors_Age: workbook.worksheets[0].getRow(index).values[2],
+        };
+      }
+    }
+  }
+  return array;
+}
 module.exports = {
   readFile,
   downloadPdf,
