@@ -59,7 +59,7 @@ const readFile = async (req, res) => {
       //console.log(resp)
     }
     if (resp.length > 0) {
-      let response = await axios.get("http://localhost:5051/get");
+      await axios.get("http://localhost:5051/get");
     }
     l;
     //res.send(resp);
