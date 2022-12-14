@@ -2,12 +2,13 @@ const excelJs = require("exceljs");
 const PDFDocument = require("pdfkit");
 const fs = require("fs");
 const user = require("../Model/user");
+const axios = require("axios");
 
 //Reading Excel File
 const readFile = async (req, res) => {
   try {
-    let resp1;
-    let msg = [];
+    let resp1 = [];
+    let errMsg = [];
     const workbook = new excelJs.Workbook();
     await workbook.xlsx.readFile(req.file.path);
     fs.unlinkSync(req.file.path);
@@ -24,29 +25,44 @@ const readFile = async (req, res) => {
       if (resp.status === "ERROR") {
         msg.push({ location: resp.location, message: resp.message });
       } else {
-        //Field validation
-        resp1 = fieldValidation(rCount, workbook);
-        if (resp1.status === "ERROR") {
-          msg.push(resp1);
-        } else {
-          console.log("Response:", resp1);
+        for (let index = 2; index <= rCount; index++) {
+          let resp = fieldValidation(
+            workbook.worksheets[0].getRow(index).values
+          );
+          console.log(resp);
+          if (resp.status === "Success") {
+            resp1.push(resp.data);
+          } else {
+            for (const msg of resp.message) {
+              errMsg.push({
+                location: "Row" + index,
+                message: msg.message,
+              });
+            }
+          }
         }
       }
     } else {
       msg.push("Data is not available in sheet ");
     }
-    //console.log(msg);
+    console.log(resp1);
 
-    console.log(msg);
+    console.log(errMsg);
 
     // //Db Insertion
-    if (msg.length > 0) {
+    let resp;
+    if (errMsg.length > 0) {
       throw "Insertion failed";
     } else {
-      const resp = await user.bulkCreate(resp1);
-      res.send(resp);
+      resp = await user.bulkCreate(resp1);
+      // res.send(resp);
       //console.log(resp)
     }
+    if (resp.length > 0) {
+      let response = await axios.get("http://localhost:5051/get");
+    }
+    l;
+    //res.send(resp);
   } catch (error) {
     res.send(error);
     console.log(error);
@@ -77,7 +93,7 @@ const downloadPdf = async (req, res) => {
     arr.map((res) => {
       sum += res;
     });
-    Nam;
+
     console.log("Sum of age:", sum);
     console.log("Count :", count);
 
@@ -97,13 +113,11 @@ const downloadPdf = async (req, res) => {
         100
       );
     doc.end();
-    res.send("Pdf created successfully");
+    //res.send("Pdf created successfully");
   } catch (error) {
     console.log(error);
   }
 };
-
-
 
 //Validate name
 function onlyLetters(str) {
@@ -127,39 +141,34 @@ function validateHeaders(headerRow) {
 
 //Field validation
 
-function fieldValidation(rCount, workbook) {
-  let array = [];
-
-  for (let index = 2; index <= rCount; index++) {
-    if (
-      workbook.worksheets[0].getRow(index).values[1] == null ||
-      workbook.worksheets[0].getRow(index).values[2] == null
-    ) {
-      return {
-        status: "Error",
-        Message: "Field must not be empty",
-        location: "Row" + index,
-      };
-    } else {
-      if (
-        onlyLetters(workbook.worksheets[0].getRow(index).values[1]) &&
-        containsOnlyNumbers(workbook.worksheets[0].getRow(index).values[2])
-      ) {
-        let data1 = {
-          Name: element[1],
-          Age: element[2],
-        };
-        array.push(data1);
-      } else {
-        return {
-          status: "ERROR",
-          error_Name: workbook.worksheets[0].getRow(index).values[1],
-          errors_Age: workbook.worksheets[0].getRow(index).values[2],
-        };
-      }
-    }
+function fieldValidation(row) {
+  //console.log("row:", row);
+  let errArray = [];
+  if (!onlyLetters(row[1])) {
+    errArray.push({
+      status: "Error",
+      message: "Name is not valid",
+    });
   }
-  return array;
+
+  if (!containsOnlyNumbers(row[2])) {
+    errArray.push({
+      status: "Error",
+      message: "Age are not valid",
+    });
+  }
+
+  if (errArray.length === 0) {
+    return {
+      status: "Success",
+      data: {
+        Name: row[1],
+        Age: row[2],
+      },
+    };
+  } else {
+    return { status: "Error", message: errArray };
+  }
 }
 module.exports = {
   readFile,
