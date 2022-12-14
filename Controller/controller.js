@@ -61,7 +61,7 @@ const readFile = async (req, res) => {
     if (resp.length > 0) {
       await axios.get("http://localhost:5051/get");
     }
-    l;
+    
     //res.send(resp);
   } catch (error) {
     res.send(error);
