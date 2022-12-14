@@ -13,40 +13,58 @@ const readFile = async (req, res) => {
     fs.unlinkSync(req.file.path);
 
     workbook.eachSheet(function (workSheet) {
-      const rCount = workSheet.rowCount - 1;
-
+      const actualCount = workSheet.actualRowCount;
+      const rCount = workSheet.rowCount;
       console.log(rCount);
 
-      if (rCount > 0 && workSheet.columnCount === 2) {
-        workSheet.eachRow(function (row) {
-          if (row.values[1] == null || row.values[2] == null) {
-            throw " field must not be empty";
-            //msg.push(err1);
-          } else {
+      //Check data availability in sheet
+      if (actualCount > 1) {
+        let resp = validateHeaders(workSheet.getRow(1).values);
+        //header validation
+        if (resp.status === "ERROR") {
+          msg.push({ location: resp.location, message: resp.message });
+        } else {
+          for (let index = 2; index <= rCount; index++) {
+            const element = workSheet.getRow(index).values;
+            //console.log("Element", element);
             if (
-              onlyLetters(row.values[1]) &&
-              containsOnlyNumbers(row.values[2])
+              workSheet.getRow(index).values[1] == null ||
+              workSheet.getRow(index).values[2] == null
             ) {
-              let data1 = {
-                Name: row.values[1],
-                Age: row.values[2],
-              };
-              data.push(data1);
+              msg.push({
+                Message: "Field must not be empty",
+                location: "Row" + index,
+              });
             } else {
-              let err = "Name or Age is not in proper format";
-              msg.push(err);
+              if (
+                onlyLetters(workSheet.getRow(index).values[1]) &&
+                containsOnlyNumbers(workSheet.getRow(index).values[2])
+              ) {
+                let data1 = {
+                  Name: element[1],
+                  Age: element[2],
+                };
+                data.push(data1);
+              } else {
+                msg.push({
+                  status: "ERROR",
+                  error_Name: workSheet.getRow(index).values[1],
+                  errors_Age: workSheet.getRow(index).values[2],
+                });
+              }
             }
           }
-        });
+        }
       } else {
-        const message = "Row is not existed";
-        msg.push(message);
+        msg.push("Data is not available in sheet ");
       }
-    });
-    console.log(data);
-    console.log(msg);
+      //console.log(msg);
 
-    //Db Insertion
+      console.log(msg);
+      console.log(data);
+    });
+
+    // //Db Insertion
     const resp = await user.bulkCreate(data);
     res.send(resp);
   } catch (error) {
@@ -79,7 +97,7 @@ const downloadPdf = async (req, res) => {
     arr.map((res) => {
       sum += res;
     });
-
+    Nam;
     console.log("Sum of age:", sum);
     console.log("Count :", count);
 
@@ -112,6 +130,17 @@ function onlyLetters(str) {
 
 function containsOnlyNumbers(str) {
   return /^[0-9]+$/.test(str);
+}
+
+//validation function
+function validateHeaders(headerRow) {
+  // console.log(headerRow);
+
+  if (headerRow[1] !== "Name" || headerRow[2] !== "Age") {
+    return { status: "ERROR", location: "ROW 1", message: "Incorrect Header." };
+  } else {
+    return { status: "SUCCESS" };
+  }
 }
 
 module.exports = {
