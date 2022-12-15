@@ -8,12 +8,11 @@ const axios = require("axios");
 const readExcelFile = async (req, res) => {
   const data = [];
   const errMsg = [];
-  console.log("Path", req.file.path);
-  
+
+  console.log(path);
   // Read excel file
   const wb = new excelJs.Workbook();
-  await wb.xlsx.readFile(req.file.path);
-  fs.unlinkSync(req.file.path)
+  await wb.xlsx.readFile(req.file.root);
   const sheetCount = wb.worksheets.length;
 
   // Check empty sheets
@@ -36,6 +35,7 @@ const readExcelFile = async (req, res) => {
         }
         // Checking only those rows which have a value
         else if (row.hasValues) {
+          let flag = true;
           const alphabetRegex = new RegExp(/[a-zA-Z]+/);
           const numberRegex = new RegExp(/[0-9]+/);
           if (
@@ -45,7 +45,7 @@ const readExcelFile = async (req, res) => {
             alphabetRegex.test(row.values[1]) &&
             numberRegex.test(row.values[2])
           ) {
-            data.push({ Name: row.values[1], Age: row.values[2] });
+            data.push({ name: row.values[1], age: row.values[2] });
           } else {
             errMsg.push({
               location: "Row " + rowNumber,
@@ -68,6 +68,75 @@ const readExcelFile = async (req, res) => {
 
   if (resp.length > 0) {
     await axios.get("http://localhost:5051/get");
+  } else {
+    throw "Unable to download ";
+  }
+};
+
+readExcelFile();
+
+//Reading Excel File And Uploading
+const readFile = async (req, res) => {
+  try {
+    let resp1 = [];
+    let errMsg = [];
+    const workbook = new excelJs.Workbook();
+    await workbook.xlsx.readFile(req.file.path);
+    fs.unlinkSync(req.file.path);
+
+    //let workSheet = workbook.getWorksheet[0];
+    const actualCount = workbook.worksheets[0].actualRowCount;
+    const rCount = workbook.worksheets[0].rowCount;
+    console.log(rCount);
+
+    //Check data availability in sheet
+    if (actualCount > 1) {
+      let resp = validateHeaders(workbook.worksheets[0].getRow(1).values);
+      //header validation
+      if (resp.status === "ERROR") {
+        msg.push({ location: resp.location, message: resp.message });
+      } else {
+        for (let index = 2; index <= rCount; index++) {
+          let resp = fieldValidation(
+            workbook.worksheets[0].getRow(index).values
+          );
+          console.log(resp);
+          if (resp.status === "Success") {
+            resp1.push(resp.data);
+          } else {
+            for (const msg of resp.message) {
+              errMsg.push({
+                location: "Row" + index,
+                message: msg.message,
+              });
+            }
+          }
+        }
+      }
+    } else {
+      msg.push("Data is not available in sheet ");
+    }
+    console.log(resp1);
+
+    console.log(errMsg);
+
+    // //Db Insertion
+    let resp;
+    if (errMsg.length > 0) {
+      throw "Insertion failed";
+    } else {
+      resp = await user.bulkCreate(resp1);
+      // res.send(resp);
+      //console.log(resp)
+    }
+    if (resp.length > 0) {
+      await axios.get("http://localhost:5051/get");
+    }
+
+    //res.send(resp);
+  } catch (error) {
+    res.send(error);
+    console.log(error);
   }
 };
 
@@ -121,7 +190,59 @@ const downloadPdf = async (req, res) => {
   }
 };
 
+//Validate name
+function onlyLetters(str) {
+  return /^[a-zA-Z]+$/.test(str);
+}
+//Validate Age
+function containsOnlyNumbers(str) {
+  return /^[0-9]+$/.test(str);
+}
+
+//Header validation function
+function validateHeaders(headerRow) {
+  // console.log(headerRow);
+
+  if (headerRow[1] !== "Name" || headerRow[2] !== "Age") {
+    return { status: "ERROR", location: "ROW 1", message: "Incorrect Header." };
+  } else {
+    return { status: "SUCCESS" };
+  }
+}
+
+//Field validation
+
+function fieldValidation(row) {
+  //console.log("row:", row);
+  let errArray = [];
+  if (!onlyLetters(row[1])) {
+    errArray.push({
+      status: "Error",
+      message: "Name is not valid",
+    });
+  }
+
+  if (!containsOnlyNumbers(row[2])) {
+    errArray.push({
+      status: "Error",
+      message: "Age are not valid",
+    });
+  }
+
+  if (errArray.length === 0) {
+    return {
+      status: "Success",
+      data: {
+        Name: row[1],
+        Age: row[2],
+      },
+    };
+  } else {
+    return { status: "Error", message: errArray };
+  }
+}
 module.exports = {
+  readFile,
   downloadPdf,
   readExcelFile,
 };
