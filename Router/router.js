@@ -2,7 +2,6 @@ const router = require("express").Router();
 const Controller = require("../Controller/controller");
 const multer = require("multer");
 
-const maxSize = 1000000;
 //multer storage
 
 var storage = multer.diskStorage({
@@ -19,7 +18,7 @@ const upload = multer({
   storage: storage,
 });
 
-router.post("/save", upload.single("path"), Controller.readFile);
-router.get("/get",Controller.downloadPdf)
+router.post("/set", upload.single("path"), Controller.readExcelFile);
+router.get("/get", Controller.downloadPdf);
 
 module.exports = router;
